@@ -20,7 +20,7 @@ if(EMSCRIPTEN)
         "--bind"
         "-sNO_EXIT_RUNTIME=1"
         "-sASSERTIONS=0"
-        "-sTEXTDECODER=0"
+        "-sTEXTDECODER=1"
         "-flto"
     )
     
