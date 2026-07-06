@@ -70,12 +70,22 @@ private:
     }
 
     uint32_t hashSlotState(const CubeState& state, uint8_t corner_idx, uint8_t edge_idx) {
-        // Hash just the relevant pieces
+        // Hash just the relevant pieces by finding where they actually are
         uint32_t h = 0;
-        h = h * 8 + state.corner_perm[corner_idx];
-        h = h * 3 + state.corner_orient[corner_idx];
-        h = h * 12 + state.edge_perm[edge_idx];
-        h = h * 2 + state.edge_orient[edge_idx];
+        for (int i = 0; i < 8; ++i) {
+            if (state.corner_perm[i] == corner_idx) {
+                h = h * 8 + i;
+                h = h * 3 + state.corner_orient[i];
+                break;
+            }
+        }
+        for (int i = 0; i < 12; ++i) {
+            if (state.edge_perm[i] == edge_idx) {
+                h = h * 12 + i;
+                h = h * 2 + state.edge_orient[i];
+                break;
+            }
+        }
         return h;
     }
 };

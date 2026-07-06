@@ -24,26 +24,15 @@ static constexpr uint8_t CROSS_EDGE_INDICES[4] = {5, 4, 7, 6}; // DF, DR, DB, DL
 // Encode just the cross-relevant state into a compact integer
 static uint32_t encodeCrossState(const CubeState& state) {
     uint32_t encoded = 0;
+    // Track the locations and orientations of the 4 cross pieces
     for (int i = 0; i < 4; ++i) {
-        uint8_t edge_idx = CROSS_EDGE_INDICES[i];
-        uint8_t perm = state.edge_perm[edge_idx];
-        uint8_t orient = state.edge_orient[edge_idx];
-
-        // Find which cross slot this edge belongs to
-        uint8_t slot = 0;
-        for (int j = 0; j < 4; ++j) {
-            if (perm == CROSS_EDGE_INDICES[j]) {
-                slot = j;
+        uint8_t target_piece = CROSS_EDGE_INDICES[i];
+        for (int j = 0; j < 12; ++j) {
+            if (state.edge_perm[j] == target_piece) {
+                encoded = encoded * 24 + j * 2 + state.edge_orient[j];
                 break;
             }
         }
-        // If not a cross edge, mark as in "other" slot
-        if (perm != CROSS_EDGE_INDICES[0] && perm != CROSS_EDGE_INDICES[1] &&
-            perm != CROSS_EDGE_INDICES[2] && perm != CROSS_EDGE_INDICES[3]) {
-            slot = 4 + (perm % 8); // non-cross edge, encode its identity
-        }
-
-        encoded = encoded * 20 + slot * 2 + orient;
     }
     return encoded;
 }

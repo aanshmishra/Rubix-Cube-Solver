@@ -100,11 +100,21 @@ private:
     }
 
     uint32_t hashCorner(const CubeState& state, uint8_t corner_idx) {
-        return state.corner_perm[corner_idx] * 3 + state.corner_orient[corner_idx];
+        for (int i = 0; i < 8; ++i) {
+            if (state.corner_perm[i] == corner_idx) {
+                return i * 3 + state.corner_orient[i];
+            }
+        }
+        return 0;
     }
 
     uint32_t hashEdge(const CubeState& state, uint8_t edge_idx) {
-        return state.edge_perm[edge_idx] * 2 + state.edge_orient[edge_idx] + 1000;
+        for (int i = 0; i < 12; ++i) {
+            if (state.edge_perm[i] == edge_idx) {
+                return i * 2 + state.edge_orient[i] + 1000;
+            }
+        }
+        return 0;
     }
 };
 

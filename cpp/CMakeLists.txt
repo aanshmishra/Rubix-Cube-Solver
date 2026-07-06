@@ -13,14 +13,14 @@ if(EMSCRIPTEN)
         "-sMODULARIZE=1"
         "-sEXPORT_NAME=createRubiksModule"
         "-sENVIRONMENT=web"
-        "-sALLOW_MEMORY_GROWTH=1"
+        "-sALLOW_MEMORY_GROWTH=0"
         "-sWASM=1"
         "-O3"
-        "-sINITIAL_MEMORY=64MB"
-        "-sMAXIMUM_MEMORY=256MB"
+        "-sINITIAL_MEMORY=128MB"
         "--bind"
         "-sNO_EXIT_RUNTIME=1"
         "-sASSERTIONS=0"
+        "-sTEXTDECODER=0"
         "-flto"
     )
     

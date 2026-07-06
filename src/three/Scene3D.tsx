@@ -62,9 +62,9 @@ function applyMoveToState(state: Map<string, { x: number; y: number; z: number; 
       if (axis === 'y') {
         // U/D rotation: rotate in XZ plane
         if (clockwise) {
-          [newX, newZ] = [newZ, -newX];
-        } else {
           [newX, newZ] = [-newZ, newX];
+        } else {
+          [newX, newZ] = [newZ, -newX];
         }
         // Rotate face colors
         const f = { ...cubie.faces }; // snapshot of originals
@@ -74,22 +74,22 @@ function applyMoveToState(state: Map<string, { x: number; y: number; z: number; 
         if (f.D) newFaces.D = f.D;
         // Rotate the lateral faces
         if (clockwise) {
-          if (f.F) newFaces.R = f.F;
-          if (f.R) newFaces.B = f.R;
-          if (f.B) newFaces.L = f.B;
-          if (f.L) newFaces.F = f.L;
-        } else {
           if (f.F) newFaces.L = f.F;
           if (f.L) newFaces.B = f.L;
           if (f.B) newFaces.R = f.B;
           if (f.R) newFaces.F = f.R;
+        } else {
+          if (f.F) newFaces.R = f.F;
+          if (f.R) newFaces.B = f.R;
+          if (f.B) newFaces.L = f.B;
+          if (f.L) newFaces.F = f.L;
         }
       } else if (axis === 'z') {
         // F/B rotation: rotate in XY plane
         if (clockwise) {
-          [newX, newY] = [-newY, newX];
-        } else {
           [newX, newY] = [newY, -newX];
+        } else {
+          [newX, newY] = [-newY, newX];
         }
         const f = { ...cubie.faces }; // snapshot of originals
         newFaces = {}; // start fresh
