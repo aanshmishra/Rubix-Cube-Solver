@@ -83,8 +83,8 @@ export interface MoveTreeNodeWasm {
   stateHash: number;
 }
 
-// Module path - this won't be resolved at build time
-const WASM_MODULE_PATH = '/wasm/rubiks_solver.js';
+// Module path - dynamically prepended with base path for local/GitHub Pages support
+const WASM_MODULE_PATH = `${import.meta.env.BASE_URL}wasm/rubiks_solver.js`;
 
 export async function loadWasmModule(): Promise<WasmModule> {
   if (wasmModule) {
