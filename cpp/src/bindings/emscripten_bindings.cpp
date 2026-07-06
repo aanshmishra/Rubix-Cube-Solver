@@ -30,6 +30,9 @@ static std::string movesToString(const std::vector<Move>& moves) {
 // ---------------------------------------------------------------------------
 EMSCRIPTEN_BINDINGS(rubiks_bindings) {
 
+    // Register vector<Move> to allow binding std::vector<Move>
+    register_vector<Move>("MoveVector");
+
     // ---- Enums ----
     enum_<Move>("Move")
         .value("U", Move::U)
