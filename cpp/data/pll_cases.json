@@ -1,0 +1,27 @@
+{
+  "name": "PLL (Permutation of the Last Layer)",
+  "description": "21 algorithms to permute all last-layer pieces into their correct positions.",
+  "cases": [
+    {"id": 1, "name": "Aa Perm", "cycle": "corners 3-cycle CW", "algorithm": "x R' U R' D2 R U' R' D2 R2 x'", "difficulty": "easy", "type": "corner"},
+    {"id": 2, "name": "Ab Perm", "cycle": "corners 3-cycle CCW", "algorithm": "x R2 D2 R U R' D2 R U' R x'", "difficulty": "easy", "type": "corner"},
+    {"id": 3, "name": "E Perm", "cycle": "corners double swap", "algorithm": "x' R U' R' D R U R' D' R U R' D R U' R' D' x", "difficulty": "hard", "type": "corner"},
+    {"id": 4, "name": "F Perm", "cycle": "adjacent swap", "algorithm": "R' U' F' R U R' U' R' F R2 U' R' U' R U R' U R", "difficulty": "hard", "type": "corner+edge"},
+    {"id": 5, "name": "Ga Perm", "cycle": "adjacent corner swap + edge", "algorithm": "R2 U R' U R' U' R U' R2 D U' R' U R D'", "difficulty": "medium", "type": "corner+edge"},
+    {"id": 6, "name": "Gb Perm", "cycle": "adjacent corner swap + edge", "algorithm": "R' U' R U D' R2 U R' U R U' R U' R2 D", "difficulty": "medium", "type": "corner+edge"},
+    {"id": 7, "name": "Gc Perm", "cycle": "adjacent corner swap + edge", "algorithm": "R2 U' R U' R U R' U R2 D' U R U' R' D", "difficulty": "medium", "type": "corner+edge"},
+    {"id": 8, "name": "Gd Perm", "cycle": "adjacent corner swap + edge", "algorithm": "R U R' U' D R2 U' R U' R' U R' U R2 D'", "difficulty": "medium", "type": "corner+edge"},
+    {"id": 9, "name": "H Perm", "cycle": "opposite edge swap", "algorithm": "M2 U M2 U2 M2 U M2", "difficulty": "easy", "type": "edge"},
+    {"id": 10, "name": "Ja Perm", "cycle": "adjacent edge+corner swap", "algorithm": "x R2 F R F' R U2 r' U r U2 x'", "difficulty": "medium", "type": "corner+edge"},
+    {"id": 11, "name": "Jb Perm", "cycle": "adjacent edge+corner swap", "algorithm": "R U R' F' R U R' U' R' F R2 U' R'", "difficulty": "medium", "type": "corner+edge"},
+    {"id": 12, "name": "Na Perm", "cycle": "diagonal corner+edge swap", "algorithm": "R U R' U R U R' F' R U R' U' R' F R2 U' R' U2 R U' R'", "difficulty": "hard", "type": "corner+edge"},
+    {"id": 13, "name": "Nb Perm", "cycle": "diagonal corner+edge swap", "algorithm": "R' U R U' R' F' U' F R U R' F R' F' R U' R", "difficulty": "hard", "type": "corner+edge"},
+    {"id": 14, "name": "Ra Perm", "cycle": "adjacent swap", "algorithm": "R U' R' U' R U R D R' U' R D' R' U2 R'", "difficulty": "hard", "type": "corner+edge"},
+    {"id": 15, "name": "Rb Perm", "cycle": "adjacent swap", "algorithm": "R' U2 R' D' R U' R' D R U R U' R' U' R", "difficulty": "hard", "type": "corner+edge"},
+    {"id": 16, "name": "T Perm", "cycle": "adjacent corner swap", "algorithm": "R U R' U' R' F R2 U' R' U' R U R' F'", "difficulty": "easy", "type": "corner"},
+    {"id": 17, "name": "Ua Perm", "cycle": "edges 3-cycle CW", "algorithm": "R U' R U R U R U' R' U' R2", "difficulty": "easy", "type": "edge"},
+    {"id": 18, "name": "Ub Perm", "cycle": "edges 3-cycle CCW", "algorithm": "R2 U R U R' U' R' U' R' U R'", "difficulty": "easy", "type": "edge"},
+    {"id": 19, "name": "V Perm", "cycle": "diagonal corner swap", "algorithm": "R' U R' U' y R' F' R2 U' R' U R' F R F", "difficulty": "hard", "type": "corner"},
+    {"id": 20, "name": "Y Perm", "cycle": "adjacent corner swap + diagonal edge", "algorithm": "F R U' R' U' R U R' F' R U R' U' R' F R F'", "difficulty": "medium", "type": "corner+edge"},
+    {"id": 21, "name": "Z Perm", "cycle": "adjacent edge swap", "algorithm": "M' U M2 U M2 U M' U2 M2", "difficulty": "medium", "type": "edge"}
+  ]
+}

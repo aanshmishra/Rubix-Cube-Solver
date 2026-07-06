@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 24% 98%;
+    --foreground: 215 28% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 28% 13%;
+    --primary: 184 64% 27%;
+    --primary-foreground: 180 40% 98%;
+    --secondary: 212 19% 91%;
+    --secondary-foreground: 215 28% 18%;
+    --muted: 210 18% 94%;
+    --muted-foreground: 214 11% 42%;
+    --accent: 39 92% 58%;
+    --accent-foreground: 31 60% 13%;
+    --destructive: 0 74% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 213 16% 84%;
+    --input: 213 16% 84%;
+    --ring: 184 64% 27%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 215 26% 9%;
+    --foreground: 210 24% 94%;
+    --card: 216 22% 13%;
+    --card-foreground: 210 24% 94%;
+    --popover: 216 22% 13%;
+    --popover-foreground: 210 24% 94%;
+    --primary: 181 54% 48%;
+    --primary-foreground: 188 60% 8%;
+    --secondary: 216 16% 20%;
+    --secondary-foreground: 210 24% 94%;
+    --muted: 216 16% 18%;
+    --muted-foreground: 214 12% 68%;
+    --accent: 39 92% 58%;
+    --accent-foreground: 31 60% 13%;
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 216 14% 24%;
+    --input: 216 14% 24%;
+    --ring: 181 54% 48%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  ::selection {
+    @apply bg-primary/20 text-foreground;
+  }
+}
+
+/* Cube face colors - vivid official palette */
+.cube-face-w { background-color: #ffffff; border: 1px solid #d1d5db; }
+.cube-face-r { background-color: #b90000; }
+.cube-face-g { background-color: #009b48; }
+.cube-face-y { background-color: #ffd500; }
+.cube-face-o { background-color: #ff5900; }
+.cube-face-b { background-color: #0045ad; }
+
+.dark .cube-face-w { background-color: #e8e8e8; border: 1px solid #9ca3af; }
+.dark .cube-face-r { background-color: #dc2626; }
+.dark .cube-face-g { background-color: #22c55e; }
+.dark .cube-face-y { background-color: #eab308; }
+.dark .cube-face-o { background-color: #f97316; }
+.dark .cube-face-b { background-color: #3b82f6; }
+
+/* Sticker button hover */
+.sticker-btn {
+  @apply transition-all duration-150 cursor-pointer;
+}
+.sticker-btn:hover {
+  @apply scale-110 z-10;
+  filter: brightness(1.15);
+}
+.sticker-btn:active {
+  @apply scale-95;
+}
+
+/* Algorithm notation styling */
+.alg-notation {
+  @apply font-mono text-sm bg-muted px-2 py-1 rounded;
+}
+
+/* Move tree node */
+.tree-node {
+  @apply transition-all duration-200;
+}
+.tree-node:hover {
+  @apply bg-muted;
+}
+
+.app-surface {
+  background: hsl(var(--background));
+}
+
+.panel-grid {
+  /* Clean — no grid overlay */
+}
