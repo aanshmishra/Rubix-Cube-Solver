@@ -17,10 +17,10 @@ if(EMSCRIPTEN)
         "-sWASM=1"
         "-O3"
         "-sINITIAL_MEMORY=128MB"
+        "-sMAXIMUM_MEMORY=128MB"
         "--bind"
         "-sNO_EXIT_RUNTIME=1"
         "-sASSERTIONS=0"
-        "-sTEXTDECODER=0"
         "-flto"
     )
     
