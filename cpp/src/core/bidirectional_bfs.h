@@ -33,8 +33,24 @@ struct BidiBFSConfig {
 // Node stored in the BFS visited maps
 struct BFSNode {
     CubeState state;
-    std::vector<Move> path;
+    uint64_t parent;
+    Move move;
+    int depth;
 };
+
+// Helper to reconstruct path from start to meeting point
+inline std::vector<Move> reconstructPath(uint64_t hash, uint64_t start_hash, const std::unordered_map<uint64_t, BFSNode>& visited) {
+    std::vector<Move> path;
+    uint64_t curr = hash;
+    while (curr != start_hash) {
+        auto it = visited.find(curr);
+        if (it == visited.end()) break;
+        path.push_back(it->second.move);
+        curr = it->second.parent;
+    }
+    std::reverse(path.begin(), path.end());
+    return path;
+}
 
 // Returns the solution move sequence, or empty vector if not found.
 inline std::vector<Move> bidirectionalBFS(
@@ -42,7 +58,6 @@ inline std::vector<Move> bidirectionalBFS(
     const CubeState& goal,
     const BidiBFSConfig& config
 ) {
-    // Quick check: is start already at goal (under the projected hash)?
     uint64_t start_hash = config.hash_fn(start);
     uint64_t goal_hash = config.hash_fn(goal);
 
@@ -50,21 +65,16 @@ inline std::vector<Move> bidirectionalBFS(
         return {};
     }
 
-    // Forward visited: hash -> BFSNode (state + path from start)
     std::unordered_map<uint64_t, BFSNode> forward_visited;
-    // Backward visited: hash -> BFSNode (state + path from goal)
     std::unordered_map<uint64_t, BFSNode> backward_visited;
 
-    // BFS frontiers (queues of hashes to expand from)
     std::queue<uint64_t> forward_queue;
     std::queue<uint64_t> backward_queue;
 
-    // Seed the forward search
-    forward_visited[start_hash] = {start, {}};
+    forward_visited[start_hash] = {start, start_hash, Move::NONE, 0};
     forward_queue.push(start_hash);
 
-    // Seed the backward search
-    backward_visited[goal_hash] = {goal, {}};
+    backward_visited[goal_hash] = {goal, goal_hash, Move::NONE, 0};
     backward_queue.push(goal_hash);
 
     int iterations = 0;
@@ -74,14 +84,14 @@ inline std::vector<Move> bidirectionalBFS(
            total_depth <= config.max_depth &&
            iterations < config.max_iterations) {
 
-        // Expand one full level from the smaller frontier
         bool expand_forward = (forward_queue.size() <= backward_queue.size());
 
         auto& active_queue = expand_forward ? forward_queue : backward_queue;
         auto& active_visited = expand_forward ? forward_visited : backward_visited;
         auto& other_visited = expand_forward ? backward_visited : forward_visited;
+        uint64_t active_start = expand_forward ? start_hash : goal_hash;
+        uint64_t other_start = expand_forward ? goal_hash : start_hash;
 
-        // Process all nodes at the current level
         int level_size = static_cast<int>(active_queue.size());
 
         for (int n = 0; n < level_size && iterations < config.max_iterations; ++n) {
@@ -94,10 +104,9 @@ inline std::vector<Move> bidirectionalBFS(
             if (it == active_visited.end()) continue;
 
             const CubeState& current_state = it->second.state;
-            const std::vector<Move>& current_path = it->second.path;
+            int current_depth = it->second.depth;
 
-            // Skip if this path is already too deep for one direction
-            if (static_cast<int>(current_path.size()) > config.max_depth) continue;
+            if (current_depth > config.max_depth) continue;
 
             for (int mi = 0; mi < config.num_moves; ++mi) {
                 Move move = config.moves[mi];
@@ -107,40 +116,30 @@ inline std::vector<Move> bidirectionalBFS(
 
                 uint64_t next_hash = config.hash_fn(next);
 
-                // Check for collision with the other frontier
                 auto collision_it = other_visited.find(next_hash);
                 if (collision_it != other_visited.end()) {
-                    // Found a meeting point! Reconstruct the full path.
-                    std::vector<Move> new_path = current_path;
-                    new_path.push_back(move);
-
-                    const std::vector<Move>& other_path = collision_it->second.path;
+                    std::vector<Move> active_path = reconstructPath(current_hash, active_start, active_visited);
+                    active_path.push_back(move);
+                    
+                    std::vector<Move> other_path = reconstructPath(next_hash, other_start, other_visited);
 
                     if (expand_forward) {
-                        // forward_path + reversed(backward_path)
-                        std::vector<Move> result = new_path;
+                        std::vector<Move> result = active_path;
                         for (int i = static_cast<int>(other_path.size()) - 1; i >= 0; --i) {
                             result.push_back(inverseMove(other_path[i]));
                         }
                         return result;
                     } else {
-                        // We expanded backward, so:
-                        // other_path (forward) + reversed(new_path)
-                        const std::vector<Move>& fwd_path = collision_it->second.path;
-                        std::vector<Move> result = fwd_path;
-                        // new_path is the backward path including the current move
-                        for (int i = static_cast<int>(new_path.size()) - 1; i >= 0; --i) {
-                            result.push_back(inverseMove(new_path[i]));
+                        std::vector<Move> result = other_path;
+                        for (int i = static_cast<int>(active_path.size()) - 1; i >= 0; --i) {
+                            result.push_back(inverseMove(active_path[i]));
                         }
                         return result;
                     }
                 }
 
-                // If not visited in this direction, add to frontier
                 if (active_visited.find(next_hash) == active_visited.end()) {
-                    std::vector<Move> new_path = current_path;
-                    new_path.push_back(move);
-                    active_visited[next_hash] = {next, new_path};
+                    active_visited[next_hash] = {next, current_hash, move, current_depth + 1};
                     active_queue.push(next_hash);
                 }
             }
