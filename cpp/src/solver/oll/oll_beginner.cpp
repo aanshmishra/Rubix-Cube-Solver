@@ -1,124 +1,58 @@
 #include "oll_base.h"
-#include <unordered_map>
-#include <unordered_set>
-#include <queue>
+#include "../masks.h"
 #include "../../core/bidirectional_bfs.h"
+#include "../../core/validation.h"
 
 namespace rubiks {
 
 // ---------------------------------------------------------------------------
-// Beginner OLL: Two-step approach
+// Beginner OLL - the classic 2-look split, done by search.
 //
-// Step 1: Orient last-layer edges (make cross on top)
-// Step 2: Orient last-layer corners
+//   Look 1: flip the last-layer edges only (the "cross on top" step). The mask
+//           drops corner orientation entirely, so corners may be left twisted.
+//   Look 2: orient the corners, with edge orientation back in the mask so the
+//           first look cannot be undone.
 //
-// Uses simplified BFS for each sub-step.
+// Two shallow searches instead of one deeper one: faster to find, longer to
+// execute. Same BFS, same absence of any case table.
 // ---------------------------------------------------------------------------
 
 class OLLBeginner : public OLLStrategy {
 public:
     std::vector<Move> solve(const CubeState& state) override {
-        CubeState working = state;
-        std::vector<Move> all_moves;
+        if (isOLLSolved(state)) return {};
 
-        // Step 1: Orient U edges
-        std::vector<Move> edge_moves = orientEdges(working);
-        working.applyMoves(edge_moves);
-        all_moves.insert(all_moves.end(), edge_moves.begin(), edge_moves.end());
+        CubeState cur = state;
+        std::vector<Move> out;
 
-        // Step 2: Orient U corners
-        std::vector<Move> corner_moves = orientCorners(working);
-        working.applyMoves(corner_moves);
-        all_moves.insert(all_moves.end(), corner_moves.begin(), corner_moves.end());
+        OrientationMask edges_only;
+        edges_only.include_corner_orient = false;
+        run(cur, out, edges_only, 6);
 
-        return all_moves;
+        OrientationMask everything;
+        everything.include_corner_orient = true;
+        run(cur, out, everything, 7);
+
+        return out;
     }
 
-    const char* name() const override { return "Beginner OLL (2-step)"; }
-    int numCases() const override { return 3; } // 3 edge cases + 7 corner cases simplified
+    const char* name() const override { return "Beginner OLL (2-look)"; }
+    int numCases() const override { return 2; }
 
 private:
-    std::vector<Move> orientEdges(CubeState state) {
-        if (areEdgesOriented(state)) return {};
-
-        const Move MOVES[14] = {
-            Move::R, Move::Rp, Move::R2,
-            Move::L, Move::Lp, Move::L2,
-            Move::F, Move::Fp, Move::F2,
-            Move::B, Move::Bp,
-            Move::U, Move::Up, Move::U2,
-        };
-
-        BidiBFSConfig config;
-        config.moves = MOVES;
-        config.num_moves = 14;
-        config.hash_fn = [this](const CubeState& s) -> uint64_t {
-            return this->hashEdges(s);
-        };
-        config.max_depth = 12;
-
-        return bidirectionalBFS(state, CubeState::solved(), config);
-    }
-
-    std::vector<Move> orientCorners(CubeState state) {
-        if (areCornersOriented(state)) return {};
-
-        const Move MOVES[14] = {
-            Move::R, Move::Rp, Move::R2,
-            Move::L, Move::Lp, Move::L2,
-            Move::F, Move::Fp, Move::F2,
-            Move::B, Move::Bp,
-            Move::U, Move::Up, Move::U2,
-        };
-
-        BidiBFSConfig config;
-        config.moves = MOVES;
-        config.num_moves = 14;
-        config.hash_fn = [this](const CubeState& s) -> uint64_t {
-            return this->hashCorners(s);
-        };
-        config.max_depth = 14;
-
-        return bidirectionalBFS(state, CubeState::solved(), config);
-    }
-
-    bool areEdgesOriented(const CubeState& state) {
-        const uint8_t u_edges[4] = {0, 1, 2, 3};
-        for (uint8_t e : u_edges) {
-            if (state.edge_orient[e] != 0) return false;
-        }
-        return true;
-    }
-
-    bool areCornersOriented(const CubeState& state) {
-        const uint8_t u_corners[4] = {0, 1, 2, 3};
-        for (uint8_t c : u_corners) {
-            if (state.corner_orient[c] != 0) return false;
-        }
-        return true;
-    }
-
-    uint64_t hashEdges(const CubeState& state) {
-        uint64_t h = 0;
-        const uint8_t u_edges[4] = {0, 1, 2, 3};
-        for (uint8_t e : u_edges) {
-            h = h * 2 + state.edge_orient[e];
-        }
-        return h;
-    }
-
-    uint64_t hashCorners(const CubeState& state) {
-        uint64_t h = 0;
-        const uint8_t u_corners[4] = {0, 1, 2, 3};
-        for (uint8_t c : u_corners) {
-            h = h * 3 + state.corner_orient[c];
-        }
-        return h;
+    template <typename MaskFn>
+    static void run(CubeState& cur, std::vector<Move>& out, MaskFn mask, int depth) {
+        auto r = bidirectionalBFS<Key128>(cur, CubeState::solved(), mask,
+                                          depth, MOVES_URF, 9,
+                                          /*max_nodes=*/2000000);
+        if (!r.found) return;
+        cur.applyMoves(r.moves);
+        out.insert(out.end(), r.moves.begin(), r.moves.end());
     }
 };
 
 OLLStrategyPtr createOLLBeginner() {
-    return std::make_unique<OLLBeginner>();
+    return OLLStrategyPtr(new OLLBeginner());
 }
 
 } // namespace rubiks

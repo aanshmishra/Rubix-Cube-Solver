@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "vitest",
-    "wasm:build": "cd cpp && emcmake cmake -B build && cmake --build build && cp build/rubiks_solver.js build/rubiks_solver.wasm ../public/wasm/",
+    "wasm:build": "powershell -ExecutionPolicy Bypass -File cpp/build.ps1",
+    "wasm:build:cmake": "cd cpp && emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --config Release",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },

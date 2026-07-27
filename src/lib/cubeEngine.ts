@@ -158,14 +158,39 @@ function facePriority(move: string): number {
   return FACE_PRIORITIES[move[0]] ?? 0;
 }
 
-export function getPrunedMoves(previousMove?: string): MoveName[] {
-  if (!previousMove) return [...MOVE_NAMES];
-
-  return MOVE_NAMES.filter((move) => {
-    if (isSameFace(move, previousMove)) return false;
-    if (isOppositeFace(move, previousMove) && facePriority(move) < facePriority(previousMove)) {
-      return false;
-    }
+const PRUNED_MOVES: Record<string, MoveName[]> = {};
+MOVE_NAMES.forEach(prev => {
+  PRUNED_MOVES[prev] = MOVE_NAMES.filter(m => {
+    if (isSameFace(m, prev)) return false;
+    if (isOppositeFace(m, prev) && facePriority(m) < facePriority(prev)) return false;
     return true;
   });
+});
+PRUNED_MOVES['root'] = [...MOVE_NAMES];
+
+export function getPrunedMoves(previousMove?: string): MoveName[] {
+  return PRUNED_MOVES[previousMove || 'root'];
+}
+
+const SUBSET_PRUNED_MOVES = new Map<string, Record<string, MoveName[]>>();
+
+export function getPrunedMovesSubset(allowedFaces: string[], previousMove?: string): MoveName[] {
+  const subsetKey = allowedFaces.join('');
+  let table = SUBSET_PRUNED_MOVES.get(subsetKey);
+  
+  if (!table) {
+    table = {};
+    const baseMoves = MOVE_NAMES.filter(m => allowedFaces.includes(m[0]));
+    table['root'] = baseMoves;
+    MOVE_NAMES.forEach(prev => {
+      table![prev] = baseMoves.filter(m => {
+        if (isSameFace(m, prev)) return false;
+        if (isOppositeFace(m, prev) && facePriority(m) < facePriority(prev)) return false;
+        return true;
+      });
+    });
+    SUBSET_PRUNED_MOVES.set(subsetKey, table);
+  }
+  
+  return table[previousMove || 'root'];
 }

@@ -83,18 +83,6 @@ export interface SolveHistoryEntry {
   solutionNotation: string;
 }
 
-// Explorer node
-export interface ExplorerNode {
-  id: string;
-  move: string;
-  depth: number;
-  moveCount: number;
-  stateHash: number;
-  expanded: boolean;
-  children: string[];
-  path: string[];
-}
-
 // Physical orientation
 export type PhysicalOrientation = 'WG' | 'WB' | 'WR' | 'WO' | 'YG' | 'YB' | 'YR' | 'YO' |
   'GW' | 'GY' | 'GR' | 'GO' | 'BW' | 'BY' | 'BR' | 'BO' |

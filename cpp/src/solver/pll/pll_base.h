@@ -23,6 +23,11 @@ public:
 
 using PLLStrategyPtr = std::unique_ptr<PLLStrategy>;
 
+// Two-look permutation: corners first (U-edge order left free), then the
+// remaining edges. Shared because the advanced strategy falls back to it when
+// its single combined search runs out of depth.
+std::vector<Move> solvePLLTwoLook(const CubeState& state);
+
 // Factory functions
 PLLStrategyPtr createPLLAdvanced();
 PLLStrategyPtr createPLLBeginner();

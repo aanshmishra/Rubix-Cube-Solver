@@ -26,8 +26,16 @@ dist-ssr
 # WASM build artifacts (built in CI)
 cpp/build/
 
-# but keep the public wasm directory for dev
-cpp/build
+# Native test harness (cpp/tests, built with g++ - see cpp/tests/main.cpp)
+cpp/solver_tests.exe
+cpp/solver_tests
+*.o
+
+# Emscripten output. Committed builds go stale against the C++ silently, so
+# treat public/wasm as generated: CI rebuilds it, and a missing module just
+# makes the app fall back to the TypeScript solver.
+public/wasm/*.js
+public/wasm/*.wasm
 
 # Test coverage
 coverage/

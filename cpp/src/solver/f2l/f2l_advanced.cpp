@@ -1,97 +1,54 @@
 #include "f2l_base.h"
-#include <unordered_map>
-#include <unordered_set>
-#include <queue>
+#include "../masks.h"
 #include "../../core/bidirectional_bfs.h"
 
 namespace rubiks {
 
 // ---------------------------------------------------------------------------
-// Advanced F2L: Standard 1-look pair insertion
+// Advanced F2L - one search per pair ("1-look").
 //
-// Uses simplified pattern matching for common F2L cases.
-// In a full implementation, this would have 41 case lookup tables.
-// Here we use a simplified BFS approach for each slot.
+// Corner and edge of a slot are inserted together by a single meet-in-the-
+// middle search. The mask carries every piece solved so far plus the current
+// pair, so a later pair physically cannot wreck an earlier one: any sequence
+// that displaced a tracked piece would change the mask and so would not reach
+// the goal projection.
+//
+// No case table is consulted. "1-look" here means the pair is solved in one
+// search, not that one of 41 memorised cases was recognised.
 // ---------------------------------------------------------------------------
 
 class F2LAdvanced : public F2LStrategy {
 public:
     std::vector<Move> solve(const CubeState& state) override {
-        CubeState working = state;
-        std::vector<Move> all_moves;
+        CubeState cur = state;
+        std::vector<Move> out;
 
-        // Solve each F2L slot: DFR, DLF, DBL, DRB
-        const uint8_t slots[4][2] = {
-            {4, 8},  // corner DFR(4), edge FR(8)
-            {5, 9},  // corner DLF(5), edge FL(9)
-            {6, 10}, // corner DBL(6), edge BL(10)
-            {7, 11}, // corner DRB(7), edge BR(11)
-        };
+        TrackedPiecesMask mask;
+        mask.edge_ids.assign(std::begin(CROSS_EDGE_IDS), std::end(CROSS_EDGE_IDS));
 
         for (int i = 0; i < 4; ++i) {
-            std::vector<Move> slot_moves = solveSlot(working, slots[i][0], slots[i][1]);
-            working.applyMoves(slot_moves);
-            all_moves.insert(all_moves.end(), slot_moves.begin(), slot_moves.end());
+            mask.corner_ids.push_back(F2L_CORNER_IDS[i]);
+            mask.edge_ids.push_back(F2L_SLOT_EDGE_IDS[i]);
+
+            // A pair always fits in 11 moves; 7 + 7 leaves margin.
+            auto r = bidirectionalBFS<Key64>(cur, CubeState::solved(), mask,
+                                             /*max_depth=*/7, MOVES_ALL, 18,
+                                             /*max_nodes=*/2000000);
+            if (!r.found) return out;  // dispatcher reports the failure
+
+            cur.applyMoves(r.moves);
+            out.insert(out.end(), r.moves.begin(), r.moves.end());
         }
 
-        return all_moves;
+        return out;
     }
 
-    const char* name() const override { return "Advanced F2L"; }
-
-private:
-    std::vector<Move> solveSlot(CubeState state, uint8_t corner_idx, uint8_t edge_idx) {
-        if (isSlotSolved(state, corner_idx, edge_idx)) return {};
-
-        const Move MOVES[11] = {
-            Move::U, Move::U2, Move::Up,
-            Move::R, Move::Rp,
-            Move::F, Move::Fp,
-            Move::L, Move::Lp,
-            Move::B, Move::Bp,
-        };
-
-        BidiBFSConfig config;
-        config.moves = MOVES;
-        config.num_moves = 11;
-        config.hash_fn = [this, corner_idx, edge_idx](const CubeState& s) -> uint64_t {
-            return this->hashSlotState(s, corner_idx, edge_idx);
-        };
-        config.max_depth = 12;
-
-        return bidirectionalBFS(state, CubeState::solved(), config);
-    }
-
-    bool isSlotSolved(const CubeState& state, uint8_t corner_idx, uint8_t edge_idx) {
-        return state.corner_perm[corner_idx] == corner_idx &&
-               state.corner_orient[corner_idx] == 0 &&
-               state.edge_perm[edge_idx] == edge_idx &&
-               state.edge_orient[edge_idx] == 0;
-    }
-
-    uint32_t hashSlotState(const CubeState& state, uint8_t corner_idx, uint8_t edge_idx) {
-        // Hash just the relevant pieces by finding where they actually are
-        uint32_t h = 0;
-        for (int i = 0; i < 8; ++i) {
-            if (state.corner_perm[i] == corner_idx) {
-                h = h * 8 + i;
-                h = h * 3 + state.corner_orient[i];
-                break;
-            }
-        }
-        for (int i = 0; i < 12; ++i) {
-            if (state.edge_perm[i] == edge_idx) {
-                h = h * 12 + i;
-                h = h * 2 + state.edge_orient[i];
-                break;
-            }
-        }
-        return h;
-    }
+    const char* name() const override { return "Advanced F2L (1-look pairs)"; }
+    int numPairs() const override { return 4; }
 };
 
 F2LStrategyPtr createF2LAdvanced() {
-    return std::make_unique<F2LAdvanced>();
+    return F2LStrategyPtr(new F2LAdvanced());
 }
 
 } // namespace rubiks

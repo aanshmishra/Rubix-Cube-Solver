@@ -1,121 +1,57 @@
-#include "cube_state.h"
-#include <algorithm>
+﻿#include "cube_state.h"
 #include <sstream>
 
 namespace rubiks {
 
 // ---------------------------------------------------------------------------
-// Move tables — pre-computed permutation data for each move
+// Quarter-turn move tables, indexed by face (U, R, F, D, L, B).
+//
+// GENERATED from the TypeScript engine (src/lib/cubeEngine.ts +
+// src/lib/solver/cubieCoords.ts) by applying each base move to a solved cube
+// and reading back the resulting cubie coordinates. Do not hand-edit: if the
+// TS facelet geometry ever changes, regenerate rather than patch.
+//
+// Semantics (destination-indexed, so both tables are read with the same index):
+//   cp_new[i] = cp_old[CORNER_SRC[f][i]]
+//   co_new[i] = (co_old[CORNER_SRC[f][i]] + CORNER_TWIST[f][i]) % 3
 // ---------------------------------------------------------------------------
 
-// Corner permutation: corner_perm[move][pos] = new position mapping
-static const uint8_t CORNER_PERM[NUM_MOVES][NUM_CORNERS] = {
-    // U
-    {1, 2, 3, 0, 4, 5, 6, 7},
-    // U2
-    {2, 3, 0, 1, 4, 5, 6, 7},
-    // U'
-    {3, 0, 1, 2, 4, 5, 6, 7},
-    // R
-    {0, 1, 3, 4, 7, 5, 6, 2},
-    // R2
-    {0, 1, 4, 7, 3, 5, 6, 2},
-    // R'
-    {0, 1, 7, 2, 3, 5, 6, 4},
-    // F
-    {2, 1, 5, 3, 0, 4, 6, 7},
-    // F2
-    {5, 1, 4, 3, 2, 0, 6, 7},
-    // F'
-    {4, 1, 0, 3, 5, 2, 6, 7},
-    // D
-    {0, 1, 2, 3, 5, 6, 7, 4},
-    // D2
-    {0, 1, 2, 3, 6, 7, 4, 5},
-    // D'
-    {0, 1, 2, 3, 7, 4, 5, 6},
-    // L
-    {0, 5, 1, 3, 4, 6, 2, 7},
-    // L2
-    {0, 6, 2, 3, 4, 1, 5, 7},
-    // L'
-    {0, 6, 2, 3, 4, 1, 5, 7},
-    // B
-    {0, 7, 2, 1, 4, 5, 3, 6},
-    // B2
-    {0, 6, 2, 7, 4, 5, 1, 3},
-    // B'
-    {0, 3, 2, 6, 4, 5, 7, 1},
+static const uint8_t CORNER_SRC[NUM_FACES][NUM_CORNERS] = {
+    { 3, 0, 1, 2, 4, 5, 6, 7 },  // U
+    { 4, 1, 2, 0, 7, 5, 6, 3 },  // R
+    { 1, 5, 2, 3, 0, 4, 6, 7 },  // F
+    { 0, 1, 2, 3, 5, 6, 7, 4 },  // D
+    { 0, 2, 6, 3, 4, 1, 5, 7 },  // L
+    { 0, 1, 3, 7, 4, 5, 2, 6 },  // B
 };
 
-// Corner orientation change: corner_orient[move][pos] = orientation delta
-static const uint8_t CORNER_ORIENT[NUM_MOVES][NUM_CORNERS] = {
-    {0, 0, 0, 0, 0, 0, 0, 0},  // U
-    {0, 0, 0, 0, 0, 0, 0, 0},  // U2
-    {0, 0, 0, 0, 0, 0, 0, 0},  // U'
-    {0, 0, 1, 2, 2, 0, 0, 1},  // R
-    {0, 0, 0, 0, 0, 0, 0, 0},  // R2
-    {0, 0, 2, 1, 1, 0, 0, 2},  // R'
-    {1, 0, 2, 0, 2, 1, 0, 0},  // F
-    {0, 0, 0, 0, 0, 0, 0, 0},  // F2
-    {2, 0, 1, 0, 1, 2, 0, 0},  // F'
-    {0, 0, 0, 0, 0, 0, 0, 0},  // D
-    {0, 0, 0, 0, 0, 0, 0, 0},  // D2
-    {0, 0, 0, 0, 0, 0, 0, 0},  // D'
-    {0, 1, 2, 0, 0, 2, 1, 0},  // L
-    {0, 0, 0, 0, 0, 0, 0, 0},  // L2
-    {0, 1, 0, 0, 0, 2, 1, 0},  // L'
-    {0, 2, 0, 1, 0, 0, 2, 1},  // B
-    {0, 0, 0, 0, 0, 0, 0, 0},  // B2
-    {0, 1, 0, 2, 0, 0, 1, 2},  // B'
+static const uint8_t CORNER_TWIST[NUM_FACES][NUM_CORNERS] = {
+    { 0, 0, 0, 0, 0, 0, 0, 0 },  // U
+    { 2, 0, 0, 1, 1, 0, 0, 2 },  // R
+    { 1, 2, 0, 0, 2, 1, 0, 0 },  // F
+    { 0, 0, 0, 0, 0, 0, 0, 0 },  // D
+    { 0, 1, 2, 0, 0, 2, 1, 0 },  // L
+    { 0, 0, 1, 2, 0, 0, 2, 1 },  // B
 };
 
-// Edge permutation: edge_perm[move][pos] = new position mapping
-static const uint8_t EDGE_PERM[NUM_MOVES][NUM_EDGES] = {
-    {1, 2, 3, 0, 4, 5, 6, 7, 8, 9, 10, 11},  // U
-    {2, 3, 0, 1, 4, 5, 6, 7, 8, 9, 10, 11},  // U2
-    {3, 0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11},  // U'
-    {0, 1, 2, 11, 4, 5, 6, 9, 8, 3, 10, 7},  // R
-    {0, 1, 2, 9, 4, 5, 6, 11, 8, 7, 10, 3},  // R2
-    {0, 1, 2, 9, 4, 5, 6, 11, 8, 7, 10, 3},  // R'
-    {0, 9, 2, 3, 8, 5, 6, 7, 1, 4, 10, 11},  // F
-    {0, 4, 2, 3, 9, 5, 6, 7, 1, 8, 10, 11},  // F2
-    {0, 8, 2, 3, 9, 5, 6, 7, 4, 1, 10, 11},  // F'
-    {0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10, 11},  // D
-    {0, 1, 2, 3, 6, 7, 4, 5, 8, 9, 10, 11},  // D2
-    {0, 1, 2, 3, 7, 4, 5, 6, 8, 9, 10, 11},  // D'
-    {0, 1, 10, 3, 4, 9, 6, 7, 8, 2, 5, 11},  // L
-    {0, 1, 5, 3, 4, 10, 6, 7, 8, 2, 9, 11},  // L2
-    {0, 1, 5, 3, 4, 10, 6, 7, 8, 2, 9, 11},  // L'
-    {0, 1, 2, 7, 4, 5, 10, 3, 8, 9, 6, 11},  // B
-    {0, 1, 2, 10, 4, 5, 7, 6, 8, 9, 3, 11},  // B2
-    {0, 1, 2, 6, 4, 5, 10, 3, 8, 9, 7, 11},  // B'
+static const uint8_t EDGE_SRC[NUM_FACES][NUM_EDGES] = {
+    { 3, 0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11 },  // U
+    { 8, 1, 2, 3, 11, 5, 6, 7, 4, 9, 10, 0 },  // R
+    { 0, 9, 2, 3, 4, 8, 6, 7, 1, 5, 10, 11 },  // F
+    { 0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10, 11 },  // D
+    { 0, 1, 10, 3, 4, 5, 9, 7, 8, 2, 6, 11 },  // L
+    { 0, 1, 2, 11, 4, 5, 6, 10, 8, 9, 3, 7 },  // B
 };
 
-// Edge orientation change: edge_orient[move][pos] = orientation delta
-static const uint8_t EDGE_ORIENT[NUM_MOVES][NUM_EDGES] = {
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // U
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // U2
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // U'
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // R
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // R2
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // R'
-    {0, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0},  // F
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // F2
-    {0, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0},  // F'
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // D
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // D2
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // D'
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L2
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // L'
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // B
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // B2
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // B'
+static const uint8_t EDGE_FLIP[NUM_FACES][NUM_EDGES] = {
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },  // U
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },  // R
+    { 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0 },  // F
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },  // D
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },  // L
+    { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1 },  // B
 };
 
-// ---------------------------------------------------------------------------
-// CubeState implementation
 // ---------------------------------------------------------------------------
 
 CubeState::CubeState() {
@@ -139,38 +75,35 @@ CubeState CubeState::solved() {
 }
 
 void CubeState::applyMove(Move move) {
-    uint8_t m = static_cast<uint8_t>(move);
+    const uint8_t m = static_cast<uint8_t>(move);
     if (m >= NUM_MOVES) return;
 
-    // The quarter-turn tables are the source of truth. Double and inverse
-    // turns are composed from them so hand-written derived tables cannot drift.
-    const uint8_t base_move = static_cast<uint8_t>((m / 3) * 3);
-    const uint8_t turns = static_cast<uint8_t>((m % 3) + 1);
+    // Only the six quarter-turn tables exist; doubles and inverses are composed
+    // from them so derived tables cannot drift out of sync.
+    const uint8_t face = m / 3;
+    const uint8_t turns = (m % 3) + 1;
 
-    for (uint8_t turn = 0; turn < turns; ++turn) {
-        auto old_cp = corner_perm;
-        auto old_co = corner_orient;
-        auto old_ep = edge_perm;
-        auto old_eo = edge_orient;
+    for (uint8_t t = 0; t < turns; ++t) {
+        const auto old_cp = corner_perm;
+        const auto old_co = corner_orient;
+        const auto old_ep = edge_perm;
+        const auto old_eo = edge_orient;
 
         for (uint8_t i = 0; i < NUM_CORNERS; ++i) {
-            uint8_t src = CORNER_PERM[base_move][i];
+            const uint8_t src = CORNER_SRC[face][i];
             corner_perm[i] = old_cp[src];
-            corner_orient[i] = (old_co[src] + CORNER_ORIENT[base_move][src]) % 3;
+            corner_orient[i] = static_cast<uint8_t>((old_co[src] + CORNER_TWIST[face][i]) % 3);
         }
-
         for (uint8_t i = 0; i < NUM_EDGES; ++i) {
-            uint8_t src = EDGE_PERM[base_move][i];
+            const uint8_t src = EDGE_SRC[face][i];
             edge_perm[i] = old_ep[src];
-            edge_orient[i] = (old_eo[src] + EDGE_ORIENT[base_move][src]) % 2;
+            edge_orient[i] = static_cast<uint8_t>((old_eo[src] + EDGE_FLIP[face][i]) % 2);
         }
     }
 }
 
 void CubeState::applyMoves(const std::vector<Move>& moves) {
-    for (Move m : moves) {
-        applyMove(m);
-    }
+    for (Move m : moves) applyMove(m);
 }
 
 void CubeState::applyNotation(const std::string& notation) {
@@ -184,102 +117,69 @@ bool CubeState::operator==(const CubeState& other) const {
            edge_orient == other.edge_orient;
 }
 
-size_t CubeState::hash() const {
-    // FNV-1a hash
-    uint64_t h = 14695981039346656037ULL;
-    auto mix = [&h](uint8_t v) {
-        h ^= static_cast<uint64_t>(v);
-        h *= 1099511628211ULL;
-    };
-    for (auto v : corner_perm) mix(v);
-    for (auto v : corner_orient) mix(v);
-    for (auto v : edge_perm) mix(v);
-    for (auto v : edge_orient) mix(v);
-    return static_cast<size_t>(h);
-}
+// ---------------------------------------------------------------------------
+// Move sets available to the searches. The last-layer stages use the <U,R,F>
+// and <U,R> subgroups: a smaller branching factor, and the first two layers
+// cannot be disturbed by moves that never touch them.
+// ---------------------------------------------------------------------------
+
+const Move MOVES_ALL[18] = {
+    Move::U, Move::U2, Move::Up,
+    Move::R, Move::R2, Move::Rp,
+    Move::F, Move::F2, Move::Fp,
+    Move::D, Move::D2, Move::Dp,
+    Move::L, Move::L2, Move::Lp,
+    Move::B, Move::B2, Move::Bp,
+};
+
+const Move MOVES_URF[9] = {
+    Move::U, Move::U2, Move::Up,
+    Move::R, Move::R2, Move::Rp,
+    Move::F, Move::F2, Move::Fp,
+};
+
+const Move MOVES_UR[6] = {
+    Move::U, Move::U2, Move::Up,
+    Move::R, Move::R2, Move::Rp,
+};
 
 // ---------------------------------------------------------------------------
 // Move utilities
 // ---------------------------------------------------------------------------
 
+static const char* const MOVE_NAMES[NUM_MOVES] = {
+    "U", "U2", "U'",
+    "R", "R2", "R'",
+    "F", "F2", "F'",
+    "D", "D2", "D'",
+    "L", "L2", "L'",
+    "B", "B2", "B'",
+};
+
 Move moveFromString(const std::string& s) {
-    if (s == "U") return Move::U;
-    if (s == "U2") return Move::U2;
-    if (s == "U'") return Move::Up;
-    if (s == "R") return Move::R;
-    if (s == "R2") return Move::R2;
-    if (s == "R'") return Move::Rp;
-    if (s == "F") return Move::F;
-    if (s == "F2") return Move::F2;
-    if (s == "F'") return Move::Fp;
-    if (s == "D") return Move::D;
-    if (s == "D2") return Move::D2;
-    if (s == "D'") return Move::Dp;
-    if (s == "L") return Move::L;
-    if (s == "L2") return Move::L2;
-    if (s == "L'") return Move::Lp;
-    if (s == "B") return Move::B;
-    if (s == "B2") return Move::B2;
-    if (s == "B'") return Move::Bp;
+    for (uint8_t i = 0; i < NUM_MOVES; ++i) {
+        if (s == MOVE_NAMES[i]) return static_cast<Move>(i);
+    }
     return Move::NONE;
 }
 
 std::string moveToString(Move m) {
-    switch (m) {
-        case Move::U: return "U";
-        case Move::U2: return "U2";
-        case Move::Up: return "U'";
-        case Move::R: return "R";
-        case Move::R2: return "R2";
-        case Move::Rp: return "R'";
-        case Move::F: return "F";
-        case Move::F2: return "F2";
-        case Move::Fp: return "F'";
-        case Move::D: return "D";
-        case Move::D2: return "D2";
-        case Move::Dp: return "D'";
-        case Move::L: return "L";
-        case Move::L2: return "L2";
-        case Move::Lp: return "L'";
-        case Move::B: return "B";
-        case Move::B2: return "B2";
-        case Move::Bp: return "B'";
-        default: return "?";
-    }
+    const uint8_t i = static_cast<uint8_t>(m);
+    return i < NUM_MOVES ? MOVE_NAMES[i] : "?";
 }
 
 Move inverseMove(Move m) {
-    switch (m) {
-        case Move::U: return Move::Up;
-        case Move::U2: return Move::U2;
-        case Move::Up: return Move::U;
-        case Move::R: return Move::Rp;
-        case Move::R2: return Move::R2;
-        case Move::Rp: return Move::R;
-        case Move::F: return Move::Fp;
-        case Move::F2: return Move::F2;
-        case Move::Fp: return Move::F;
-        case Move::D: return Move::Dp;
-        case Move::D2: return Move::D2;
-        case Move::Dp: return Move::D;
-        case Move::L: return Move::Lp;
-        case Move::L2: return Move::L2;
-        case Move::Lp: return Move::L;
-        case Move::B: return Move::Bp;
-        case Move::B2: return Move::B2;
-        case Move::Bp: return Move::B;
-        default: return Move::NONE;
-    }
+    const uint8_t i = static_cast<uint8_t>(m);
+    if (i >= NUM_MOVES) return Move::NONE;
+    const uint8_t face = i / 3;
+    const uint8_t amount = i % 3;          // 0 = quarter, 1 = half, 2 = inverse
+    const uint8_t inv = amount == 1 ? 1 : (amount == 0 ? 2 : 0);
+    return static_cast<Move>(face * 3 + inv);
 }
 
 Face moveFace(Move m) {
-    uint8_t mi = static_cast<uint8_t>(m);
-    if (mi < 3) return Face::U;
-    if (mi < 6) return Face::R;
-    if (mi < 9) return Face::F;
-    if (mi < 12) return Face::D;
-    if (mi < 15) return Face::L;
-    return Face::B;
+    const uint8_t i = static_cast<uint8_t>(m);
+    return i < NUM_MOVES ? static_cast<Face>(i / 3) : Face::COUNT;
 }
 
 std::vector<Move> parseNotation(const std::string& notation) {
@@ -288,11 +188,44 @@ std::vector<Move> parseNotation(const std::string& notation) {
     std::string token;
     while (iss >> token) {
         Move m = moveFromString(token);
-        if (m != Move::NONE) {
-            moves.push_back(m);
-        }
+        if (m != Move::NONE) moves.push_back(m);
     }
     return moves;
+}
+
+std::vector<Move> simplifyMoves(const std::vector<Move>& moves) {
+    // Quarter-turn count for each amount slot: X -> 1, X2 -> 2, X' -> 3.
+    static const uint8_t TURNS[3] = {1, 2, 3};
+    // Inverse mapping, quarter-turns -> amount slot.
+    static const int8_t SLOT[4] = {-1, 0, 1, 2};
+
+    std::vector<Move> out = moves;
+    bool changed = true;
+
+    // A cancellation can expose a new neighbouring pair (R U U' R -> R R -> R2),
+    // so sweep until the sequence stops shrinking. These are a few dozen moves
+    // at most, so the repeated passes cost nothing worth measuring.
+    while (changed) {
+        changed = false;
+        std::vector<Move> pass;
+        pass.reserve(out.size());
+
+        for (Move m : out) {
+            if (!pass.empty() && moveFace(pass.back()) == moveFace(m)) {
+                const uint8_t face = static_cast<uint8_t>(moveFace(m));
+                const uint8_t total = (TURNS[static_cast<uint8_t>(pass.back()) % 3] +
+                                       TURNS[static_cast<uint8_t>(m) % 3]) % 4;
+                pass.pop_back();
+                if (total != 0) pass.push_back(static_cast<Move>(face * 3 + SLOT[total]));
+                changed = true;
+            } else {
+                pass.push_back(m);
+            }
+        }
+        out.swap(pass);
+    }
+
+    return out;
 }
 
 std::string movesToNotation(const std::vector<Move>& moves) {

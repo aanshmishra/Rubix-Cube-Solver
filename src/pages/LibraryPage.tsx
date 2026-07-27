@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -26,8 +26,11 @@ import {
 import ollData from '../../cpp/data/oll_cases.json';
 import pllData from '../../cpp/data/pll_cases.json';
 
-const OLL_CASES: AlgorithmCase[] = ollData.cases;
-const PLL_CASES: AlgorithmCase[] = pllData.cases;
+// TypeScript widens every string in an imported JSON file to `string`, so the
+// `difficulty` field will not narrow to its union on its own. These files are
+// checked in beside the code, so asserting the shape at the boundary is safe.
+const OLL_CASES = ollData.cases as AlgorithmCase[];
+const PLL_CASES = pllData.cases as AlgorithmCase[];
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -106,27 +109,6 @@ export default function LibraryPage() {
                 <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
               )}
             </div>
-
-            {/* Pattern visualization (simplified) */}
-            {alg.pattern && (
-              <div className="flex gap-0.5 mb-2">
-                {alg.pattern.split('').map((char, i) => {
-                  if (char === '.') return <div key={i} className="w-3 h-3" />;
-                  const colorMap: Record<string, string> = {
-                    R: 'bg-red-500',
-                    L: 'bg-orange-500',
-                    X: 'bg-yellow-500',
-                    B: 'bg-blue-500',
-                  };
-                  return (
-                    <div
-                      key={i}
-                      className={`w-3 h-3 rounded-sm ${colorMap[char] || 'bg-gray-400'}`}
-                    />
-                  );
-                })}
-              </div>
-            )}
 
             {alg.cycle && (
               <p className="text-xs text-muted-foreground mb-1">{alg.cycle}</p>

@@ -1,155 +1,156 @@
 #pragma once
 
 #include "cube_state.h"
-#include <queue>
-#include <unordered_map>
-#include <functional>
 #include <algorithm>
+#include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 namespace rubiks {
 
 // ---------------------------------------------------------------------------
-// Bidirectional BFS (Meet-in-the-Middle) for Rubik's Cube sub-problems.
+// Bidirectional BFS (meet in the middle) over cube sub-problems.
 //
-// Instead of searching from start to goal in one direction, we search from
-// both ends simultaneously. At each level we expand the smaller frontier
-// first. When the two frontiers collide (a projected hash appears in both
-// visited sets) we reconstruct:
-//     forward_moves + reverse(backward_moves)
+// Search runs from the scramble and from the goal at the same time, one ply
+// per side, alternating. When the frontiers collide the answer is
+//     forward_path + reverse(inverse(backward_path))
+// Cost drops from O(b^d) to O(2 * b^(d/2)).
 //
-// This dramatically reduces the search space: instead of O(b^d), we get
-// O(2 * b^(d/2)), where b is the branching factor and d the depth.
+// Each stage supplies a `mask` functor projecting a CubeState onto the part it
+// cares about. The mask MUST be congruent: if two states mask equal, they must
+// still mask equal after any move. Piece-level coordinates (which piece sits
+// in which slot, and how it is twisted) have that property; sampled sticker
+// colours do not, and a non-congruent mask lets the two frontiers "meet" at a
+// junction that does not actually connect, producing a wrong solution.
+//
+// Strict alternation is deliberate: it makes the first collision found the
+// shortest sequence for that stage's subgoal.
 // ---------------------------------------------------------------------------
 
-struct BidiBFSConfig {
-    const Move* moves;
-    int num_moves;
-    std::function<uint64_t(const CubeState&)> hash_fn;
-    int max_depth = 12;
-    int max_iterations = 200000;
+using Key64 = uint64_t;
+
+// A wide key for the stages whose projection needs more than 64 bits. Rather
+// than depend on the __int128 compiler extension (MinGW has no such type), the
+// projection is split across two independent accumulators, each of which is
+// packed in mixed radix and stays comfortably inside 64 bits. Equality is
+// exact, so distinct projections still cannot collide.
+struct Key128 {
+    uint64_t a = 0;
+    uint64_t b = 0;
+    bool operator==(const Key128& o) const noexcept { return a == o.a && b == o.b; }
+    bool operator!=(const Key128& o) const noexcept { return !(*this == o); }
 };
 
-// Node stored in the BFS visited maps
-struct BFSNode {
-    CubeState state;
-    uint64_t parent;
-    Move move;
-    int depth;
+struct KeyHash {
+    size_t operator()(uint64_t k) const noexcept {
+        k ^= k >> 33; k *= 0xff51afd7ed558ccdULL;
+        k ^= k >> 33; k *= 0xc4ceb9fe1a85ec53ULL;
+        k ^= k >> 33;
+        return static_cast<size_t>(k);
+    }
+    size_t operator()(const Key128& k) const noexcept {
+        return (*this)(k.a ^ (k.b * 0x9e3779b97f4a7c15ULL));
+    }
 };
 
-// Helper to reconstruct path from start to meeting point
-inline std::vector<Move> reconstructPath(uint64_t hash, uint64_t start_hash, const std::unordered_map<uint64_t, BFSNode>& visited) {
-    std::vector<Move> path;
-    uint64_t curr = hash;
-    while (curr != start_hash) {
-        auto it = visited.find(curr);
-        if (it == visited.end()) break;
-        path.push_back(it->second.move);
-        curr = it->second.parent;
-    }
-    std::reverse(path.begin(), path.end());
-    return path;
-}
+struct BFSResult {
+    std::vector<Move> moves;
+    bool found = false;
+    size_t nodes = 0;
+};
 
-// Returns the solution move sequence, or empty vector if not found.
-inline std::vector<Move> bidirectionalBFS(
-    const CubeState& start,
-    const CubeState& goal,
-    const BidiBFSConfig& config
-) {
-    uint64_t start_hash = config.hash_fn(start);
-    uint64_t goal_hash = config.hash_fn(goal);
+template <typename Key, typename MaskFn>
+BFSResult bidirectionalBFS(const CubeState& start,
+                           const CubeState& goal,
+                           MaskFn mask,
+                           int max_depth,
+                           const Move* move_set,
+                           int num_moves,
+                           size_t max_nodes = 3000000) {
+    BFSResult result;
 
-    if (start_hash == goal_hash) {
-        return {};
+    const Key start_key = mask(start);
+    const Key goal_key = mask(goal);
+    if (start_key == goal_key) {
+        result.found = true;
+        return result;
     }
 
-    std::unordered_map<uint64_t, BFSNode> forward_visited;
-    std::unordered_map<uint64_t, BFSNode> backward_visited;
+    struct Trace { Key parent; Move move; };
+    struct Frontier { CubeState state; Key key; Move last; };
 
-    std::queue<uint64_t> forward_queue;
-    std::queue<uint64_t> backward_queue;
+    std::unordered_map<Key, Trace, KeyHash> fwd_seen, bwd_seen;
+    std::vector<Frontier> fwd{{start, start_key, Move::NONE}};
+    std::vector<Frontier> bwd{{goal, goal_key, Move::NONE}};
 
-    forward_visited[start_hash] = {start, start_hash, Move::NONE, 0};
-    forward_queue.push(start_hash);
+    fwd_seen[start_key] = {start_key, Move::NONE};
+    bwd_seen[goal_key] = {goal_key, Move::NONE};
 
-    backward_visited[goal_hash] = {goal, goal_hash, Move::NONE, 0};
-    backward_queue.push(goal_hash);
+    // Walks parent pointers back to the search root.
+    auto trace_back = [](Key from, Key root,
+                         const std::unordered_map<Key, Trace, KeyHash>& seen) {
+        std::vector<Move> path;
+        Key cur = from;
+        while (cur != root) {
+            auto it = seen.find(cur);
+            if (it == seen.end() || it->second.move == Move::NONE) break;
+            path.push_back(it->second.move);
+            cur = it->second.parent;
+        }
+        std::reverse(path.begin(), path.end());
+        return path;
+    };
 
-    int iterations = 0;
-    int total_depth = 0;
+    // Joins the two half-paths. The backward half was built by applying moves
+    // away from the goal, so it is inverted and reversed to run back into it.
+    auto join = [&](Key meet) {
+        std::vector<Move> out = trace_back(meet, start_key, fwd_seen);
+        std::vector<Move> back = trace_back(meet, goal_key, bwd_seen);
+        for (auto it = back.rbegin(); it != back.rend(); ++it) {
+            out.push_back(inverseMove(*it));
+        }
+        return out;
+    };
 
-    while (!forward_queue.empty() && !backward_queue.empty() &&
-           total_depth <= config.max_depth &&
-           iterations < config.max_iterations) {
+    for (int depth = 1; depth <= max_depth; ++depth) {
+        for (int side = 0; side < 2; ++side) {
+            const bool forward = (side == 0);
+            std::vector<Frontier>& cur = forward ? fwd : bwd;
+            auto& own = forward ? fwd_seen : bwd_seen;
+            auto& other = forward ? bwd_seen : fwd_seen;
 
-        bool expand_forward = (forward_queue.size() <= backward_queue.size());
+            std::vector<Frontier> next;
+            next.reserve(cur.size() * 4);
 
-        auto& active_queue = expand_forward ? forward_queue : backward_queue;
-        auto& active_visited = expand_forward ? forward_visited : backward_visited;
-        auto& other_visited = expand_forward ? backward_visited : forward_visited;
-        uint64_t active_start = expand_forward ? start_hash : goal_hash;
-        uint64_t other_start = expand_forward ? goal_hash : start_hash;
+            for (const Frontier& node : cur) {
+                for (int i = 0; i < num_moves; ++i) {
+                    const Move mv = move_set[i];
+                    if (isRedundantAfter(mv, node.last)) continue;
 
-        int level_size = static_cast<int>(active_queue.size());
+                    if (++result.nodes > max_nodes) return result;
 
-        for (int n = 0; n < level_size && iterations < config.max_iterations; ++n) {
-            iterations++;
+                    CubeState child = node.state;
+                    child.applyMove(mv);
+                    const Key child_key = mask(child);
 
-            uint64_t current_hash = active_queue.front();
-            active_queue.pop();
+                    if (own.count(child_key)) continue;
+                    own[child_key] = {node.key, mv};
 
-            auto it = active_visited.find(current_hash);
-            if (it == active_visited.end()) continue;
-
-            const CubeState& current_state = it->second.state;
-            int current_depth = it->second.depth;
-
-            if (current_depth > config.max_depth) continue;
-
-            for (int mi = 0; mi < config.num_moves; ++mi) {
-                Move move = config.moves[mi];
-
-                CubeState next = current_state;
-                next.applyMove(move);
-
-                uint64_t next_hash = config.hash_fn(next);
-
-                auto collision_it = other_visited.find(next_hash);
-                if (collision_it != other_visited.end()) {
-                    std::vector<Move> active_path = reconstructPath(current_hash, active_start, active_visited);
-                    active_path.push_back(move);
-                    
-                    std::vector<Move> other_path = reconstructPath(next_hash, other_start, other_visited);
-
-                    if (expand_forward) {
-                        std::vector<Move> result = active_path;
-                        for (int i = static_cast<int>(other_path.size()) - 1; i >= 0; --i) {
-                            result.push_back(inverseMove(other_path[i]));
-                        }
-                        return result;
-                    } else {
-                        std::vector<Move> result = other_path;
-                        for (int i = static_cast<int>(active_path.size()) - 1; i >= 0; --i) {
-                            result.push_back(inverseMove(active_path[i]));
-                        }
+                    if (other.count(child_key)) {
+                        result.moves = join(child_key);
+                        result.found = true;
                         return result;
                     }
-                }
 
-                if (active_visited.find(next_hash) == active_visited.end()) {
-                    active_visited[next_hash] = {next, current_hash, move, current_depth + 1};
-                    active_queue.push(next_hash);
+                    next.push_back({child, child_key, mv});
                 }
             }
+            cur.swap(next);
+            if (cur.empty()) return result;  // subgoal unreachable
         }
-
-        total_depth++;
     }
 
-    // No solution found within limits
-    return {};
+    return result;
 }
 
 } // namespace rubiks

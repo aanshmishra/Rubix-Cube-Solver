@@ -58,21 +58,23 @@ export default function CubeNet() {
       </div>
 
       {/* Net grid */}
-      <div className="inline-block">
+      <div className="flex justify-center">
         <div
-          className="grid gap-1"
+          className="grid w-full max-w-[640px] gap-2"
           style={{
             gridTemplateColumns: 'repeat(4, 1fr)',
-            gridTemplateRows: 'repeat(3, 1fr)',
+            gridTemplateRows: 'repeat(3, auto)',
           }}
         >
           {NET_LAYOUT.map(([row, col, faceIndex]) => (
             <div
               key={faceIndex}
-              className="grid grid-cols-3 gap-0.5 p-1 rounded-lg bg-muted/50"
+              className="grid aspect-square grid-cols-3 rounded-md bg-muted/60"
               style={{
                 gridColumn: col + 1,
                 gridRow: row + 1,
+                gap: '3%',
+                padding: '4%',
               }}
             >
               {Array.from({ length: 9 }, (_, i) => (
@@ -80,8 +82,7 @@ export default function CubeNet() {
                   key={i}
                   onClick={() => handleStickerClick(faceIndex, i)}
                   className={cn(
-                    'w-10 h-10 sm:w-12 sm:h-12 rounded-sm sticker-btn transition-all',
-                    i === 4 && 'ring-1 ring-foreground/20' // Center piece
+                    'aspect-square rounded-[2px] border-2 border-black sticker-btn transition-all'
                   )}
                   style={{
                     backgroundColor: colors[facelets[faceIndex * 9 + i]],

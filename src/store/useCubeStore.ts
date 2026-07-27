@@ -5,11 +5,8 @@ import type {
   SolutionResult,
   PhysicalOrientation,
 } from '@/types';
-import { applyNotationToFacelets, solvedFacelets } from '@/lib/cubeEngine';
-
-// Default facelet state (solved cube)
-// Face order: U, R, F, D, L, B - each face is 9 stickers
-const SOLVED_FACELETS: FaceColor[] = solvedFacelets();
+import { applyNotationToFacelets } from '@/lib/cubeEngine';
+import { getSolvedFacelets } from '@/lib/orientation';
 
 // Generate a random scramble (sequence of moves)
 export function generateScramble(length: number = 25): string {
@@ -88,22 +85,30 @@ export interface CubeStore {
 }
 
 export const useCubeStore = create<CubeStore>((set, get) => ({
-  facelets: applyScrambleToFacelets(SOLVED_FACELETS, INITIAL_SCRAMBLE, INITIAL_ORIENTATION),
+  facelets: applyScrambleToFacelets(getSolvedFacelets(INITIAL_ORIENTATION), INITIAL_SCRAMBLE, INITIAL_ORIENTATION),
   setFacelets: (facelets) => set({ facelets }),
 
   scrambleNotation: INITIAL_SCRAMBLE,
   setScrambleNotation: (scrambleNotation) => set({ scrambleNotation }),
+  
   generateNewScramble: () => {
     const scrambleNotation = generateScramble();
+    
     set({
       scrambleNotation,
-      facelets: applyScrambleToFacelets(SOLVED_FACELETS, scrambleNotation, get().orientation),
+      facelets: applyScrambleToFacelets(getSolvedFacelets(get().orientation), scrambleNotation, get().orientation),
       solution: null,
     });
   },
 
   orientation: INITIAL_ORIENTATION,
-  setOrientation: (orientation) => set({ orientation }),
+  setOrientation: (orientation) => {
+    // If the cube is currently in a solved state (ignoring scrambled notation), re-paint it.
+    // We will just re-apply the current scramble to the new orientation's solved state.
+    const newSolved = getSolvedFacelets(orientation);
+    const newFacelets = applyScrambleToFacelets(newSolved, get().scrambleNotation, orientation);
+    set({ orientation, facelets: newFacelets });
+  },
 
   methodConfig: { f2lAdvanced: true, ollAdvanced: true, pllAdvanced: true },
   setMethodConfig: (methodConfig) => set({ methodConfig }),
@@ -129,12 +134,12 @@ export const useCubeStore = create<CubeStore>((set, get) => ({
   selectedColor: 'W',
   setSelectedColor: (selectedColor) => set({ selectedColor }),
 
-  resetSolved: () => set({ facelets: [...SOLVED_FACELETS], scrambleNotation: '', solution: null }),
+  resetSolved: () => set({ facelets: [...getSolvedFacelets(get().orientation)], scrambleNotation: '', solution: null }),
 
   applyScramble: () => {
     const { scrambleNotation, orientation } = get();
     set({
-      facelets: applyScrambleToFacelets(SOLVED_FACELETS, scrambleNotation, orientation),
+      facelets: applyScrambleToFacelets(getSolvedFacelets(orientation), scrambleNotation, orientation),
       solution: null,
     });
   },

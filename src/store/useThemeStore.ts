@@ -8,19 +8,9 @@ interface ThemeStore {
   setTheme: (theme: Theme) => void;
 }
 
+// Dark mode only — the app no longer exposes a light theme.
 export const useThemeStore = create<ThemeStore>((set) => ({
-  theme: (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light',
-  toggleTheme: () => set((state) => {
-    const newTheme = state.theme === 'light' ? 'dark' : 'light';
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', newTheme === 'dark');
-    }
-    return { theme: newTheme };
-  }),
-  setTheme: (theme) => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', theme === 'dark');
-    }
-    set({ theme });
-  },
+  theme: 'dark',
+  toggleTheme: () => set({ theme: 'dark' }),
+  setTheme: () => set({ theme: 'dark' }),
 }));

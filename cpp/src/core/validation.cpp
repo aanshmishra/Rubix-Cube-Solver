@@ -76,35 +76,6 @@ ValidationResult validateState(const CubeState& state) {
     return ValidationResult(true, "");
 }
 
-ValidationResult validateFacelets(const std::string& facelets) {
-    if (facelets.length() != 54) {
-        return ValidationResult(false, "Facelet string must be exactly 54 characters");
-    }
-
-    // Count each color
-    int counts[6] = {0};
-    for (char c : facelets) {
-        switch (c) {
-            case 'W': counts[0]++; break;
-            case 'R': counts[1]++; break;
-            case 'G': counts[2]++; break;
-            case 'Y': counts[3]++; break;
-            case 'O': counts[4]++; break;
-            case 'B': counts[5]++; break;
-            default:
-                return ValidationResult(false, std::string("Invalid character in facelets: ") + c);
-        }
-    }
-
-    for (int i = 0; i < 6; ++i) {
-        if (counts[i] != 9) {
-            return ValidationResult(false, "Each color must appear exactly 9 times in facelets");
-        }
-    }
-
-    return ValidationResult(true, "");
-}
-
 bool isSolved(const CubeState& state) {
     for (uint8_t i = 0; i < NUM_CORNERS; ++i) {
         if (state.corner_perm[i] != i || state.corner_orient[i] != 0) return false;
@@ -180,22 +151,6 @@ bool isOLLSolved(const CubeState& state) {
     }
 
     return true;
-}
-
-int identifyOLLCase(const CubeState& state) {
-    // Simplified: check basic patterns
-    // Full 57-case identification requires full facelet state
-    // Return -1 for unimplemented (caller should handle)
-    (void)state;
-    return -1;
-}
-
-int identifyPLLCase(const CubeState& state) {
-    // Simplified: check basic patterns
-    // Full 21-case identification requires full facelet state
-    // Return -1 for unimplemented (caller should handle)
-    (void)state;
-    return -1;
 }
 
 } // namespace rubiks

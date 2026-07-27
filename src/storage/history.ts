@@ -1,4 +1,4 @@
-import type { SolveHistoryEntry, MethodConfig, AlgorithmCase } from '@/types';
+import type { SolveHistoryEntry, MethodConfig } from '@/types';
 
 const HISTORY_KEY = 'rubiks_solver_history';
 const PROGRESS_KEY = 'rubiks_solver_progress';

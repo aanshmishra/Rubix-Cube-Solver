@@ -22,9 +22,6 @@ struct ValidationResult {
 //   3. Corner permutation parity matches edge permutation parity
 ValidationResult validateState(const CubeState& state);
 
-// Validate a facelet string (54 characters, 6 of each color)
-ValidationResult validateFacelets(const std::string& facelets);
-
 // Check if cube is solved
 bool isSolved(const CubeState& state);
 
@@ -36,11 +33,5 @@ bool isF2LSolved(const CubeState& state);
 
 // Check if OLL is solved (last layer oriented)
 bool isOLLSolved(const CubeState& state);
-
-// Get which OLL case index (0-56) this state matches, or -1 if none
-int identifyOLLCase(const CubeState& state);
-
-// Get which PLL case index (0-20) this state matches, or -1 if none
-int identifyPLLCase(const CubeState& state);
 
 } // namespace rubiks

@@ -39,10 +39,6 @@ struct SolutionResult {
     MethodConfig config;
     bool success;
     std::string error_message;
-
-    std::vector<Move> allMoves() const;
-    std::string toNotation() const;
-    int totalMoves() const;
 };
 
 // Main solver dispatcher
@@ -52,12 +48,6 @@ public:
 
     // Solve the cube using the configured method
     SolutionResult solve(const CubeState& scramble);
-
-    // Set configuration
-    void setConfig(const MethodConfig& config);
-
-    // Get current method name
-    std::string getMethodName() const;
 
 private:
     MethodConfig config_;

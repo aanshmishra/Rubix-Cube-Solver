@@ -1,7 +1,6 @@
 #include "method_dispatcher.h"
 #include "cross.h"
 #include "../core/validation.h"
-#include <sstream>
 
 namespace rubiks {
 
@@ -41,77 +40,10 @@ std::string MethodConfig::getMethodName() const {
 }
 
 // ---------------------------------------------------------------------------
-// SolutionResult
-// ---------------------------------------------------------------------------
-
-std::vector<Move> SolutionResult::allMoves() const {
-    std::vector<Move> all;
-    all.insert(all.end(), cross_moves.begin(), cross_moves.end());
-    all.insert(all.end(), f2l_moves.begin(), f2l_moves.end());
-    all.insert(all.end(), oll_moves.begin(), oll_moves.end());
-    all.insert(all.end(), pll_moves.begin(), pll_moves.end());
-    return all;
-}
-
-std::string SolutionResult::toNotation() const {
-    std::stringstream ss;
-
-    if (!cross_moves.empty()) {
-        ss << "[Cross] ";
-        for (size_t i = 0; i < cross_moves.size(); ++i) {
-            if (i > 0) ss << " ";
-            ss << moveToString(cross_moves[i]);
-        }
-        ss << "\n";
-    }
-
-    if (!f2l_moves.empty()) {
-        ss << "[F2L] ";
-        for (size_t i = 0; i < f2l_moves.size(); ++i) {
-            if (i > 0) ss << " ";
-            ss << moveToString(f2l_moves[i]);
-        }
-        ss << "\n";
-    }
-
-    if (!oll_moves.empty()) {
-        ss << "[OLL] ";
-        for (size_t i = 0; i < oll_moves.size(); ++i) {
-            if (i > 0) ss << " ";
-            ss << moveToString(oll_moves[i]);
-        }
-        ss << "\n";
-    }
-
-    if (!pll_moves.empty()) {
-        ss << "[PLL] ";
-        for (size_t i = 0; i < pll_moves.size(); ++i) {
-            if (i > 0) ss << " ";
-            ss << moveToString(pll_moves[i]);
-        }
-        ss << "\n";
-    }
-
-    return ss.str();
-}
-
-int SolutionResult::totalMoves() const {
-    return static_cast<int>(cross_moves.size() + f2l_moves.size() + oll_moves.size() + pll_moves.size());
-}
-
-// ---------------------------------------------------------------------------
 // MethodDispatcher
 // ---------------------------------------------------------------------------
 
 MethodDispatcher::MethodDispatcher(const MethodConfig& config) : config_(config) {}
-
-void MethodDispatcher::setConfig(const MethodConfig& config) {
-    config_ = config;
-}
-
-std::string MethodDispatcher::getMethodName() const {
-    return config_.getMethodName();
-}
 
 SolutionResult MethodDispatcher::solve(const CubeState& scramble) {
     SolutionResult result;
@@ -156,6 +88,12 @@ SolutionResult MethodDispatcher::solve(const CubeState& scramble) {
     CubeState after_f2l = after_cross;
     after_f2l.applyMoves(result.f2l_moves);
 
+    if (!isF2LSolved(after_f2l)) {
+        result.success = false;
+        result.error_message = "Failed to solve F2L";
+        return result;
+    }
+
     if (isSolved(after_f2l)) {
         result.success = true;
         return result;
@@ -169,6 +107,12 @@ SolutionResult MethodDispatcher::solve(const CubeState& scramble) {
 
     CubeState after_oll = after_f2l;
     after_oll.applyMoves(result.oll_moves);
+
+    if (!isOLLSolved(after_oll) || !isF2LSolved(after_oll)) {
+        result.success = false;
+        result.error_message = "Failed to orient the last layer";
+        return result;
+    }
 
     if (isSolved(after_oll)) {
         result.success = true;

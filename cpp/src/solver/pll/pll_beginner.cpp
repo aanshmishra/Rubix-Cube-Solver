@@ -1,122 +1,55 @@
 #include "pll_base.h"
-#include <unordered_map>
-#include <unordered_set>
-#include <queue>
+#include "../masks.h"
 #include "../../core/bidirectional_bfs.h"
+#include "../../core/validation.h"
 
 namespace rubiks {
 
 // ---------------------------------------------------------------------------
-// Beginner PLL: Two-step approach
+// Two-look permutation, used directly by the beginner strategy and as the
+// advanced strategy's fallback.
 //
-// Step 1: Permute last-layer corners (get them in correct positions)
-// Step 2: Permute last-layer edges
-//
-// Uses simplified BFS for each sub-step.
+//   Look 1: place the corners. The mask omits the U-layer edge order, so the
+//           search is free to churn the edges while it works - a much easier
+//           goal to reach than "everything at once".
+//   Look 2: permute the four remaining U edges. That is an EPLL state, always
+//           solvable inside the small <U,R> subgroup, so the search can afford
+//           to go deeper over a branching factor of only 6.
 // ---------------------------------------------------------------------------
+std::vector<Move> solvePLLTwoLook(const CubeState& state) {
+    CubeState cur = state;
+    std::vector<Move> out;
+
+    auto corners = bidirectionalBFS<Key128>(cur, CubeState::solved(), CornerPermMask{},
+                                            /*max_depth=*/7, MOVES_URF, 9,
+                                            /*max_nodes=*/2000000);
+    if (!corners.found) return out;
+    cur.applyMoves(corners.moves);
+    out.insert(out.end(), corners.moves.begin(), corners.moves.end());
+
+    auto edges = bidirectionalBFS<Key128>(cur, CubeState::solved(), FullStateMask{},
+                                          /*max_depth=*/9, MOVES_UR, 6,
+                                          /*max_nodes=*/2000000);
+    if (!edges.found) return out;
+    cur.applyMoves(edges.moves);
+    out.insert(out.end(), edges.moves.begin(), edges.moves.end());
+
+    return out;
+}
 
 class PLLBeginner : public PLLStrategy {
 public:
     std::vector<Move> solve(const CubeState& state) override {
-        CubeState working = state;
-        std::vector<Move> all_moves;
-
-        // Step 1: Permute U corners to correct positions
-        std::vector<Move> corner_moves = permuteCorners(working);
-        working.applyMoves(corner_moves);
-        all_moves.insert(all_moves.end(), corner_moves.begin(), corner_moves.end());
-
-        // Step 2: Permute U edges to correct positions
-        std::vector<Move> edge_moves = permuteEdges(working);
-        working.applyMoves(edge_moves);
-        all_moves.insert(all_moves.end(), edge_moves.begin(), edge_moves.end());
-
-        return all_moves;
+        if (isSolved(state)) return {};
+        return solvePLLTwoLook(state);
     }
 
-    const char* name() const override { return "Beginner PLL (2-step)"; }
+    const char* name() const override { return "Beginner PLL (2-look)"; }
     int numCases() const override { return 2; }
-
-private:
-    std::vector<Move> permuteCorners(CubeState state) {
-        if (areCornersPermuted(state)) return {};
-
-        const Move MOVES[14] = {
-            Move::R, Move::Rp, Move::R2,
-            Move::L, Move::Lp, Move::L2,
-            Move::F, Move::Fp, Move::F2,
-            Move::B, Move::Bp,
-            Move::U, Move::Up, Move::U2,
-        };
-
-        BidiBFSConfig config;
-        config.moves = MOVES;
-        config.num_moves = 14;
-        config.hash_fn = [this](const CubeState& s) -> uint64_t {
-            return this->hashCornerPerm(s);
-        };
-        config.max_depth = 14;
-
-        return bidirectionalBFS(state, CubeState::solved(), config);
-    }
-
-    std::vector<Move> permuteEdges(CubeState state) {
-        if (areEdgesPermuted(state)) return {};
-
-        const Move MOVES[14] = {
-            Move::R, Move::Rp, Move::R2,
-            Move::L, Move::Lp, Move::L2,
-            Move::F, Move::Fp, Move::F2,
-            Move::B, Move::Bp,
-            Move::U, Move::Up, Move::U2,
-        };
-
-        BidiBFSConfig config;
-        config.moves = MOVES;
-        config.num_moves = 14;
-        config.hash_fn = [this](const CubeState& s) -> uint64_t {
-            return this->hashEdgePerm(s);
-        };
-        config.max_depth = 14;
-
-        return bidirectionalBFS(state, CubeState::solved(), config);
-    }
-
-    bool areCornersPermuted(const CubeState& state) {
-        const uint8_t u_corners[4] = {0, 1, 2, 3};
-        for (uint8_t c : u_corners) {
-            if (state.corner_perm[c] != c) return false;
-        }
-        return true;
-    }
-
-    bool areEdgesPermuted(const CubeState& state) {
-        const uint8_t u_edges[4] = {0, 1, 2, 3};
-        for (uint8_t e : u_edges) {
-            if (state.edge_perm[e] != e) return false;
-        }
-        return true;
-    }
-
-    uint64_t hashCornerPerm(const CubeState& state) {
-        uint64_t h = 0;
-        for (uint8_t i = 0; i < NUM_CORNERS; ++i) {
-            h = h * 8 + state.corner_perm[i];
-        }
-        return h;
-    }
-
-    uint64_t hashEdgePerm(const CubeState& state) {
-        uint64_t h = 0;
-        for (uint8_t i = 0; i < NUM_EDGES; ++i) {
-            h = h * 12 + state.edge_perm[i];
-        }
-        return h;
-    }
 };
 
 PLLStrategyPtr createPLLBeginner() {
-    return std::make_unique<PLLBeginner>();
+    return PLLStrategyPtr(new PLLBeginner());
 }
 
 } // namespace rubiks

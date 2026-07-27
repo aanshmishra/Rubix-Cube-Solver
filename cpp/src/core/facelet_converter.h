@@ -3,51 +3,53 @@
 #include "cube_state.h"
 #include <array>
 #include <string>
-#include <vector>
+#include <unordered_map>
 
 namespace rubiks {
 
-// Facelet indices for a standard cube net layout:
+// ---------------------------------------------------------------------------
+// Facelet <-> cubie conversion.
 //
-//        0  1  2
-//        3  4  5
-//        6  7  8
-//  9 10 11 12 13 14 15 16 17
-// 18 19 20 21 22 23 24 25 26
-// 27 28 29 30 31 32 33 34 35
-//       36 37 38
-//       39 40 41
-//       42 43 44
-//       45 46 47
-//       48 49 50
-//       51 52 53
+// Facelet layout (54 chars), matching src/lib/solver/cubieCoords.ts:
+//   U = 0..8, R = 9..17, F = 18..26, D = 27..35, L = 36..44, B = 45..53
+//   each face row-major, top-left to bottom-right.
 //
-// Face order: U(0-8), R(9-17), F(18-26), D(27-35), L(36-44), B(45-53)
-//
-// Within each face: row-major (top-left to bottom-right)
+// The colour scheme is NOT hardcoded. An encoder is built from a "target"
+// string - the facelets of a solved cube in whatever physical orientation the
+// user has selected - exactly like makeCubieEncoder() on the TypeScript side.
+// That keeps every orientation working without any orientation logic in C++.
+// ---------------------------------------------------------------------------
 
 constexpr uint8_t NUM_FACELETS = 54;
 
-// Convert 54 facelet colors (as characters: W,R,G,Y,O,B) to cubie state.
-// The center pieces define the color-to-face mapping:
-// face 0 (U) center = facelet[4], face 1 (R) center = facelet[13], etc.
-//
-// physical_orientation: which face is "down" and which is "front".
-// Format: "{down_face}{front_face}" e.g., "WF" means White center Down, Green center Front.
-CubeState faceletsToState(const std::string& facelets, const std::string& physical_orientation = "WF");
+// Facelet indices of each corner slot, ordered [U/D sticker, then clockwise].
+extern const std::array<std::array<uint8_t, 3>, NUM_CORNERS> CORNER_SLOTS;
+// Facelet indices of each edge slot, ordered [primary, secondary].
+extern const std::array<std::array<uint8_t, 2>, NUM_EDGES> EDGE_SLOTS;
 
-// Convert cubie state back to facelets (for a given orientation)
-std::string stateToFacelets(const CubeState& state, const std::string& physical_orientation = "WF");
+class CubieEncoder {
+public:
+    explicit CubieEncoder(const std::string& target_facelets);
 
-// Validate that facelets form a solvable cube
-bool validateFaceletSolvable(const std::string& facelets);
+    // True when the target string is a well-formed solved cube.
+    bool valid() const { return valid_; }
 
-// Get the color of a specific sticker on a specific cubie (in solved state)
-Color getSolvedCornerColor(Corner corner, uint8_t sticker_index);
-Color getSolvedEdgeColor(Edge edge, uint8_t sticker_index);
+    // Reads 54 stickers into cubie coordinates. Returns false when the
+    // stickers do not form a legal set of pieces (e.g. a hand-painted cube
+    // with two identical corners), which is the cheapest impossible-cube check
+    // available.
+    bool encode(const std::string& facelets, CubeState& out) const;
 
-// Facelet index helpers
-uint8_t faceletIndex(Face face, uint8_t row, uint8_t col);
-Face faceFromFaceletIndex(uint8_t idx);
+    // Renders cubie coordinates back to 54 stickers in the target's scheme.
+    std::string decode(const CubeState& state) const;
+
+private:
+    struct Piece { uint8_t id; uint8_t ori; };
+
+    std::unordered_map<std::string, Piece> corner_lut_;
+    std::unordered_map<std::string, Piece> edge_lut_;
+    std::string target_;
+    bool valid_ = false;
+};
 
 } // namespace rubiks
