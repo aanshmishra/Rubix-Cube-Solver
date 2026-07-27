@@ -11,6 +11,8 @@ A browser-based Rubik's Cube solver and learning tool, pairing a React UI with a
   <img alt="License" src="https://img.shields.io/badge/License-MIT-green.svg">
 </p>
 
+**[🚀 Live Demo](https://aanshmishra.github.io/Rubix-Cube-Solver/)**
+
 ---
 
 ## Table of Contents
