@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://yourusername.github.io/rubiks-cube-solver",
+  "homepage": "https://aanshmishra.github.io/Rubix-Cube-Solver",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
